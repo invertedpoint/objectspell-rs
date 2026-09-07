@@ -1,0 +1,372 @@
+extern crate proc_macro;
+
+use proc_macro::TokenStream;
+use quote::{format_ident, quote};
+use syn::parse::{Parse, ParseStream, Result};
+use syn::{parse_macro_input, ImplItem, ItemImpl, ItemStruct, Signature, Token, Visibility};
+
+// ============================================================================
+// emitter
+// ============================================================================
+
+struct EmitterMethod {
+    vis: Visibility,
+    sig: Signature,
+}
+
+impl Parse for EmitterMethod {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let vis: Visibility = input.parse()?;
+        let sig: Signature = input.parse()?;
+        input.parse::<Token![;]>()?;
+        Ok(EmitterMethod { vis, sig })
+    }
+}
+
+struct EmitterBlock {
+    _vis: Visibility,
+    _trait_token: Token![trait],
+    ident: syn::Ident,
+    methods: Vec<EmitterMethod>,
+}
+
+impl Parse for EmitterBlock {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let _vis: Visibility = input.parse()?;
+        let _trait_token: Token![trait] = input.parse()?;
+        let ident: syn::Ident = input.parse()?;
+
+        let content;
+        syn::braced!(content in input);
+
+        let mut methods = Vec::new();
+        while !content.is_empty() {
+            methods.push(content.parse()?);
+        }
+
+        Ok(EmitterBlock {
+            _vis,
+            _trait_token,
+            ident,
+            methods,
+        })
+    }
+}
+
+/// The `#[objectspell::emitter]` macro parses a `trait StructName { ... }` definition.
+/// It drops the trait completely and instead generates an inherent `impl StructName` block
+/// containing async methods that broadcast on the internal `emitter_core`.
+#[proc_macro_attribute]
+pub fn emitter(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let block = parse_macro_input!(item as EmitterBlock);
+    let name = &block.ident;
+
+    let mut generated_methods = Vec::new();
+
+    for method in block.methods {
+        let vis = &method.vis;
+        let sig = &method.sig;
+        let sig_name = &sig.ident;
+        let sig_name_str = sig_name.to_string();
+
+        let mut with_params = Vec::new();
+        let mut fn_args = Vec::new();
+        fn_args.push(quote! { &self });
+
+        for arg in &sig.inputs {
+            if let syn::FnArg::Typed(pat_type) = arg {
+                if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
+                    let p_name = &pat_ident.ident;
+                    let p_name_str = p_name.to_string();
+                    let ty = &pat_type.ty;
+                    fn_args.push(quote! { #p_name: #ty });
+                    with_params.push(quote! { .with_param(#p_name_str, #p_name) });
+                }
+            }
+        }
+
+        generated_methods.push(quote! {
+            #vis async fn #sig_name(#(#fn_args),*) {
+                self.emitter_core.broadcast(
+                    objectspell::Signal::new(self.emitter_core.channel_name.clone(), #sig_name_str)
+                        #(#with_params)*
+                );
+            }
+        });
+    }
+
+    let gen = quote! {
+        impl #name {
+            #(#generated_methods)*
+        }
+    };
+
+    TokenStream::from(gen)
+}
+
+// ============================================================================
+// state
+// ============================================================================
+
+/// The `#[objectspell::state]` macro parses a `pub struct StructName { ... }` definition.
+/// It injects `state_core` and `emitter_core` fields, and generates `init` and `into_state`
+/// as well as the implementation for `AnyState`.
+#[proc_macro_attribute]
+pub fn state(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut struct_def = parse_macro_input!(item as ItemStruct);
+    let name = &struct_def.ident;
+    let channel_name = name.to_string(); // Default to struct name
+
+    let mut init_params = Vec::new();
+    let mut init_assigns = Vec::new();
+
+    if let syn::Fields::Named(ref mut fields) = struct_def.fields {
+        for f in &fields.named {
+            let fname = &f.ident;
+            let ftype = &f.ty;
+            init_params.push(quote! { #fname: #ftype });
+            init_assigns.push(quote! { #fname });
+        }
+
+        use syn::parse::Parser;
+        fields.named.push(
+            syn::Field::parse_named
+                .parse2(quote! { pub state_core: objectspell::StateCore })
+                .unwrap(),
+        );
+        fields.named.push(
+            syn::Field::parse_named
+                .parse2(quote! { pub emitter_core: objectspell::EmitterCore })
+                .unwrap(),
+        );
+    } else if let syn::Fields::Unit = struct_def.fields {
+        let new_fields: syn::FieldsNamed = syn::parse2(quote! {
+            {
+                pub state_core: objectspell::StateCore,
+                pub emitter_core: objectspell::EmitterCore,
+            }
+        })
+        .unwrap();
+        struct_def.fields = syn::Fields::Named(new_fields);
+    } else {
+        panic!("Tuple structs are not supported by #[objectspell::state]");
+    }
+
+    let wrapper_name = format_ident!("{}AnyStateWrapper", name);
+
+    let expanded = quote! {
+        #struct_def
+
+        impl #name {
+            /// Initializes the component with its fields + auto-injected core fields.
+            pub fn init(#(#init_params),*) -> Self {
+                Self {
+                    #(#init_assigns,)*
+                    state_core: objectspell::StateCore::new(),
+                    emitter_core: objectspell::EmitterCore::new(#channel_name),
+                }
+            }
+
+            pub fn into_state(self) -> Box<dyn objectspell::AnyState> {
+                let arc_self = std::sync::Arc::new(tokio::sync::Mutex::new(self));
+                let arc_any = std::sync::Arc::clone(&arc_self) as std::sync::Arc<dyn std::any::Any + Send + Sync>;
+                let target_id = std::any::TypeId::of::<#name>();
+
+                if let Ok(mut lock) = arc_self.try_lock() {
+                    for reg in objectspell::inventory::iter::<objectspell::DispatcherRegistration> {
+                        if (reg.target_type)() == target_id {
+                            (reg.register)(&mut lock.state_core, std::sync::Arc::clone(&arc_any));
+                        }
+                    }
+                } else {
+                    panic!("Failed to try_lock newly created arc_self in into_state");
+                }
+                Box::new(#wrapper_name { inner: arc_self })
+            }
+        }
+
+        impl objectspell::connector::Connectable for #name {
+            fn into_states(self, vec: &mut Vec<Box<dyn objectspell::AnyState>>) {
+                vec.push(self.into_state());
+            }
+        }
+
+        impl Default for #name {
+            fn default() -> Self {
+                Self {
+                    #(#init_assigns: Default::default(),)*
+                    state_core: objectspell::StateCore::new(),
+                    emitter_core: objectspell::EmitterCore::new(#channel_name),
+                }
+            }
+        }
+
+        #[doc(hidden)]
+        pub struct #wrapper_name {
+            pub inner: std::sync::Arc<tokio::sync::Mutex<#name>>
+        }
+
+        #[objectspell::async_trait]
+        impl objectspell::AnyState for #wrapper_name {
+            async fn start_listener(&self) -> Option<tokio::task::JoinHandle<()>> {
+                let rx = {
+                    let mut lock = self.inner.lock().await;
+                    lock.state_core.take_receiver()
+                };
+                let dispatchers = {
+                    let mut lock = self.inner.lock().await;
+                    std::mem::take(&mut lock.state_core.dispatchers)
+                };
+                if let Some(r) = rx {
+                    Some(tokio::spawn(async move {
+                        objectspell::StateCore::listen(r, &dispatchers).await;
+                    }))
+                } else {
+                    None
+                }
+            }
+            async fn sender(&self) -> Option<tokio::sync::mpsc::UnboundedSender<objectspell::Signal>> {
+                let lock = self.inner.lock().await;
+                Some(lock.state_core.sender())
+            }
+            async fn channels(&self) -> Vec<String> {
+                let lock = self.inner.lock().await;
+                lock.state_core.channels()
+            }
+            async fn emitter_name(&self) -> String {
+                let lock = self.inner.lock().await;
+                lock.emitter_core.channel_name.clone()
+            }
+            async fn broadcast(&self, signal: objectspell::Signal) {
+                let lock = self.inner.lock().await;
+                lock.emitter_core.broadcast(signal);
+            }
+            async fn connect_receiver(&self, sender: tokio::sync::mpsc::UnboundedSender<objectspell::Signal>) {
+                let mut lock = self.inner.lock().await;
+                lock.emitter_core.connect(sender);
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+// ============================================================================
+// receiver
+// ============================================================================
+
+/// The `#[objectspell::receiver]` macro parses an `impl ChannelName for StructName { ... }` block.
+/// It drops the trait bound to make it an inherent impl block on `StructName`, and generates
+/// `SignalDispatcher` structs for each method. It then submits an `objectspell::inventory`
+/// registration so those dispatchers are attached automatically by `into_state()`.
+#[proc_macro_attribute]
+pub fn receiver(_args: TokenStream, input: TokenStream) -> TokenStream {
+    let mut impl_block = parse_macro_input!(input as ItemImpl);
+    let self_ty = &impl_block.self_ty;
+
+    let channel_name = if let Some((_, path, _)) = &impl_block.trait_ {
+        path.segments.last().unwrap().ident.to_string()
+    } else {
+        panic!("Expected impl ChannelName for StructName");
+    };
+
+    let self_ty_str_clean = quote!(#self_ty).to_string().replace(" ", "");
+    let trait_name = format_ident!("{}ReceiverExtension{}", self_ty_str_clean, channel_name);
+    
+    let mut trait_items = Vec::new();
+    for item in impl_block.items.iter_mut() {
+        if let ImplItem::Fn(method) = item {
+            method.vis = Visibility::Inherited;
+            let sig = &method.sig;
+            trait_items.push(quote! { #sig; });
+        }
+    }
+    
+    let trait_path: syn::Path = syn::parse_str(&trait_name.to_string()).unwrap();
+    impl_block.trait_ = Some((None, trait_path, Token![for](proc_macro2::Span::call_site())));
+
+    let mut dispatchers = Vec::new();
+    let mut register_calls = Vec::new();
+
+    for item in impl_block.items.iter() {
+        if let ImplItem::Fn(method) = item {
+            let sig_name = &method.sig.ident;
+            let sig_name_str = sig_name.to_string();
+            let struct_name_str = quote!(#self_ty).to_string().replace(" ", "");
+            let dispatcher_name = format_ident!("{}Dispatcher{}", struct_name_str, sig_name_str);
+
+            let mut extractors = Vec::new();
+            let mut call_args = Vec::new();
+
+            for arg in method.sig.inputs.iter().skip(1) {
+                if let syn::FnArg::Typed(pat_type) = arg {
+                    if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
+                        let arg_name = &pat_ident.ident;
+                        let arg_name_str = arg_name.to_string();
+                        let arg_ty = &*pat_type.ty;
+
+                        extractors.push(quote! {
+                            let #arg_name: #arg_ty = serde_json::from_value(
+                                signal.message.get(#arg_name_str).cloned().unwrap_or(serde_json::Value::Null)
+                            ).unwrap_or_default();
+                        });
+                        call_args.push(quote! { #arg_name });
+                    }
+                }
+            }
+
+            dispatchers.push(quote! {
+                struct #dispatcher_name {
+                    state: std::sync::Arc<tokio::sync::Mutex<#self_ty>>,
+                }
+
+                #[objectspell::async_trait]
+                impl objectspell::SignalDispatcher for #dispatcher_name {
+                    fn channel(&self) -> &'static str {
+                        Box::leak(#channel_name.to_string().into_boxed_str())
+                    }
+
+                    async fn dispatch(&self, signal: &objectspell::Signal) -> bool {
+                        if signal.route == #sig_name_str {
+                            let state = self.state.lock().await;
+                            #(#extractors)*
+                            <#self_ty as #trait_name>::#sig_name(&*state #(, #call_args)*).await;
+                            return true;
+                        }
+                        false
+                    }
+                }
+            });
+
+            register_calls.push(quote! {
+                let typed_arc = arc_any_clone.clone().downcast::<tokio::sync::Mutex<#self_ty>>().expect("Downcast failed");
+                let dispatcher = Box::new(#dispatcher_name {
+                    state: typed_arc,
+                });
+                core.register(dispatcher);
+            });
+        }
+    }
+
+    let gen = quote! {
+        trait #trait_name {
+            #(#trait_items)*
+        }
+        
+        #impl_block
+
+        #(#dispatchers)*
+
+        objectspell::inventory::submit! {
+            objectspell::DispatcherRegistration {
+                target_type: || std::any::TypeId::of::<#self_ty>(),
+                register: |core, arc_any| {
+                    let arc_any_clone = std::sync::Arc::clone(&arc_any);
+                    #(#register_calls)*
+                }
+            }
+        }
+    };
+
+    TokenStream::from(gen)
+}

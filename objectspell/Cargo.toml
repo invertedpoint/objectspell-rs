@@ -1,0 +1,25 @@
+[package]
+name = "objectspell"
+description = "Connect async components with signals: each declares what it sends and what it listens to."
+readme = "README.md"
+keywords = ["async", "actor", "signals", "event-driven", "tokio"]
+categories = ["asynchronous", "rust-patterns"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Pinned exactly: the macros generate code against this crate's internals, so the two must
+# always be published and resolved together.
+objectspell-macros = { path = "../objectspell-macros", version = "=0.1.0" }
+tokio = { version = "1", features = ["rt", "sync"] }
+async-trait = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+inventory = "0.3.22"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "macros", "time"] }

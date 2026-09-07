@@ -1,0 +1,8 @@
+# Build artifacts
+/target
+
+# Editor backups
+*.rs.bk
+
+# macOS
+.DS_Store
