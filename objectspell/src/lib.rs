@@ -23,8 +23,6 @@ pub use objectspell_macros::{emitter, receiver, state};
 // having to add them to their own manifest.
 pub use async_trait::async_trait;
 pub use inventory;
-pub use serde;
-pub use serde_json;
 pub use tokio;
 
 /// How a receiver registers itself with the State it listens to.

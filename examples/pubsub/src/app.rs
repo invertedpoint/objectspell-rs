@@ -6,24 +6,22 @@ pub trait App {
 
 #[objectspell::state]
 pub struct App {
-    pub uncompleted_sources: std::sync::Mutex<Vec<String>>,
+    pub uncompleted_sources: Vec<String>,
 }
 
 impl App {
     pub fn new() -> Self {
         Self {
-            uncompleted_sources: std::sync::Mutex::new(vec!["Weather".to_string(), "News".to_string()]),
+            uncompleted_sources: vec!["Weather".to_string(), "News".to_string()],
             ..Default::default()
         }
     }
 
-    pub async fn use_completion(&self, completed_source: &str) {
-        let is_all_sources_completed = {
-            let mut uncompleted_sources = self.uncompleted_sources.lock().unwrap();
-            uncompleted_sources.retain(|source| source != completed_source);
-            uncompleted_sources.is_empty()
-        };
-        if is_all_sources_completed {
+    pub async fn use_completion(&mut self, completed_source: &str) {
+        self.uncompleted_sources
+            .retain(|source| source != completed_source);
+
+        if self.uncompleted_sources.is_empty() {
             self.stopped().await;
         }
     }
@@ -44,7 +42,7 @@ impl Connector for App {
 impl Weather for App {
     pub async fn weather_determined(&self, _message: String) {}
 
-    pub async fn weather_completed(&self) {
+    pub async fn weather_completed(&mut self) {
         self.use_completion("Weather").await;
     }
 }
@@ -53,7 +51,7 @@ impl Weather for App {
 impl News for App {
     pub async fn something_happened(&self, _message: String) {}
 
-    pub async fn news_completed(&self) {
+    pub async fn news_completed(&mut self) {
         self.use_completion("News").await;
     }
 }

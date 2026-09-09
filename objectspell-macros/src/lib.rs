@@ -168,7 +168,7 @@ pub fn state(_attr: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             pub fn into_state(self) -> Box<dyn objectspell::AnyState> {
-                let arc_self = std::sync::Arc::new(tokio::sync::Mutex::new(self));
+                let arc_self = std::sync::Arc::new(objectspell::tokio::sync::Mutex::new(self));
                 let arc_any = std::sync::Arc::clone(&arc_self) as std::sync::Arc<dyn std::any::Any + Send + Sync>;
                 let target_id = std::any::TypeId::of::<#name>();
 
@@ -179,7 +179,7 @@ pub fn state(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         }
                     }
                 } else {
-                    panic!("Failed to try_lock newly created arc_self in into_state");
+                    panic!("newly created state cannot already be locked");
                 }
                 Box::new(#wrapper_name { inner: arc_self })
             }
@@ -203,12 +203,12 @@ pub fn state(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
         #[doc(hidden)]
         pub struct #wrapper_name {
-            pub inner: std::sync::Arc<tokio::sync::Mutex<#name>>
+            pub inner: std::sync::Arc<objectspell::tokio::sync::Mutex<#name>>
         }
 
         #[objectspell::async_trait]
         impl objectspell::AnyState for #wrapper_name {
-            async fn start_listener(&self) -> Option<tokio::task::JoinHandle<()>> {
+            async fn start_listener(&self) -> Option<objectspell::tokio::task::JoinHandle<()>> {
                 let rx = {
                     let mut lock = self.inner.lock().await;
                     lock.state_core.take_receiver()
@@ -218,14 +218,14 @@ pub fn state(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     std::mem::take(&mut lock.state_core.dispatchers)
                 };
                 if let Some(r) = rx {
-                    Some(tokio::spawn(async move {
+                    Some(objectspell::tokio::spawn(async move {
                         objectspell::StateCore::listen(r, &dispatchers).await;
                     }))
                 } else {
                     None
                 }
             }
-            async fn sender(&self) -> Option<tokio::sync::mpsc::UnboundedSender<objectspell::Signal>> {
+            async fn sender(&self) -> Option<objectspell::tokio::sync::mpsc::UnboundedSender<objectspell::Signal>> {
                 let lock = self.inner.lock().await;
                 Some(lock.state_core.sender())
             }
@@ -241,7 +241,7 @@ pub fn state(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 let lock = self.inner.lock().await;
                 lock.emitter_core.broadcast(signal);
             }
-            async fn connect_receiver(&self, sender: tokio::sync::mpsc::UnboundedSender<objectspell::Signal>) {
+            async fn connect_receiver(&self, sender: objectspell::tokio::sync::mpsc::UnboundedSender<objectspell::Signal>) {
                 let mut lock = self.inner.lock().await;
                 lock.emitter_core.connect(sender);
             }
@@ -306,9 +306,7 @@ pub fn receiver(_args: TokenStream, input: TokenStream) -> TokenStream {
                         let arg_ty = &*pat_type.ty;
 
                         extractors.push(quote! {
-                            let #arg_name: #arg_ty = serde_json::from_value(
-                                signal.message.get(#arg_name_str).cloned().unwrap_or(serde_json::Value::Null)
-                            ).unwrap_or_default();
+                            let #arg_name: #arg_ty = signal.expect_param(#arg_name_str);
                         });
                         call_args.push(quote! { #arg_name });
                     }
@@ -317,7 +315,7 @@ pub fn receiver(_args: TokenStream, input: TokenStream) -> TokenStream {
 
             dispatchers.push(quote! {
                 struct #dispatcher_name {
-                    state: std::sync::Arc<tokio::sync::Mutex<#self_ty>>,
+                    state: std::sync::Arc<objectspell::tokio::sync::Mutex<#self_ty>>,
                 }
 
                 #[objectspell::async_trait]
@@ -328,9 +326,11 @@ pub fn receiver(_args: TokenStream, input: TokenStream) -> TokenStream {
 
                     async fn dispatch(&self, signal: &objectspell::Signal) -> bool {
                         if signal.route == #sig_name_str {
-                            let state = self.state.lock().await;
+                            // The guard is exclusive, so handlers may take `&mut self` and
+                            // mutate the component directly.
+                            let mut state = self.state.lock().await;
                             #(#extractors)*
-                            <#self_ty as #trait_name>::#sig_name(&*state #(, #call_args)*).await;
+                            <#self_ty as #trait_name>::#sig_name(&mut *state #(, #call_args)*).await;
                             return true;
                         }
                         false
@@ -339,7 +339,10 @@ pub fn receiver(_args: TokenStream, input: TokenStream) -> TokenStream {
             });
 
             register_calls.push(quote! {
-                let typed_arc = arc_any_clone.clone().downcast::<tokio::sync::Mutex<#self_ty>>().expect("Downcast failed");
+                let typed_arc = arc_any_clone
+                    .clone()
+                    .downcast::<objectspell::tokio::sync::Mutex<#self_ty>>()
+                    .expect("state registered under its own TypeId");
                 let dispatcher = Box::new(#dispatcher_name {
                     state: typed_arc,
                 });
