@@ -33,9 +33,7 @@ impl Connector for App {
         self.started().await;
     }
 
-    pub async fn disconnected(&self) {
-        std::process::exit(0);
-    }
+    pub async fn disconnected(&self) {}
 }
 
 #[objectspell::receiver]

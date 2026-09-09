@@ -54,28 +54,32 @@ impl Connector {
         }
     }
 
+    /// Wire every State to the emitters it listens to, start them, and emit `connected`.
+    ///
+    /// Does not return until the topology has shut down, so it is normally the whole program.
     pub async fn connect<C: Connectable>(self, states_tuple: C) {
-        let boxed_self = self.into_state();
+        let connector = self.into_state();
+
         let mut states_vec = Vec::new();
-        states_vec.push(boxed_self);
         states_tuple.into_states(&mut states_vec);
 
-        let states_slice_vec: Vec<&dyn AnyState> = states_vec.iter().map(|s| s.as_ref()).collect();
+        let mut states_slice_vec: Vec<&dyn AnyState> = vec![connector.as_ref()];
+        states_slice_vec.extend(states_vec.iter().map(|s| s.as_ref()));
         let states_slice = states_slice_vec.as_slice();
 
         // 1. Collect all senders and channel names for receivers
         let mut receiver_info = Vec::new();
-        for (i, state) in states_slice.iter().enumerate() {
+        for state in states_slice {
             if let Some(tx) = state.sender().await {
                 let channels = state.channels().await;
-                receiver_info.push((i, tx, channels));
+                receiver_info.push((tx, channels));
             }
         }
 
         // 2. Wire all senders to all compatible emitters
-        for (_, state) in states_slice.iter().enumerate() {
+        for state in states_slice {
             let emitter_name = state.emitter_name().await;
-            for (_, tx, channels) in &receiver_info {
+            for (tx, channels) in &receiver_info {
                 if channels.contains(&emitter_name) {
                     state.connect_receiver(tx.clone()).await;
                 }
@@ -91,16 +95,18 @@ impl Connector {
         }
 
         // 4. Trigger "connected" lifecycle event on the Connector
-        for state in states_slice {
-            if state.emitter_name().await == "Connector" {
-                state
-                    .broadcast(crate::Signal::new("Connector".to_string(), "connected"))
-                    .await;
-            }
-        }
+        let channel = connector.emitter_name().await;
+        connector
+            .broadcast(crate::Signal::new(channel, "connected"))
+            .await;
 
         for handle in handles {
             let _ = handle.await;
         }
+    }
+
+    /// Emit `disconnected`. Every listening State handles it, so this stops all of them.
+    pub async fn disconnect(&self) {
+        self.disconnected().await;
     }
 }

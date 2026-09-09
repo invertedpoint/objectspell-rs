@@ -5,6 +5,16 @@ use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream, Result};
 use syn::{parse_macro_input, ImplItem, ItemImpl, ItemStruct, Signature, Token, Visibility};
 
+/// The name a parameter travels under, which is how an emitter's argument finds the handler
+/// parameter it belongs to.
+///
+/// Leading underscores are dropped. In Rust they only silence the unused-variable lint, so a
+/// handler that ignores an argument still declares the same parameter as the signal that
+/// carries it — `_message` and `message` are one name, not two.
+fn wire_name(ident: &syn::Ident) -> String {
+    ident.to_string().trim_start_matches('_').to_string()
+}
+
 // ============================================================================
 // emitter
 // ============================================================================
@@ -77,7 +87,7 @@ pub fn emitter(_attr: TokenStream, item: TokenStream) -> TokenStream {
             if let syn::FnArg::Typed(pat_type) = arg {
                 if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
                     let p_name = &pat_ident.ident;
-                    let p_name_str = p_name.to_string();
+                    let p_name_str = wire_name(p_name);
                     let ty = &pat_type.ty;
                     fn_args.push(quote! { #p_name: #ty });
                     with_params.push(quote! { .with_param(#p_name_str, #p_name) });
@@ -178,6 +188,8 @@ pub fn state(_attr: TokenStream, item: TokenStream) -> TokenStream {
                             (reg.register)(&mut lock.state_core, std::sync::Arc::clone(&arc_any));
                         }
                     }
+                    // After the hand-written receivers, so that on a shared route theirs runs first.
+                    lock.state_core.install_connector_receiver();
                 } else {
                     panic!("newly created state cannot already be locked");
                 }
@@ -209,21 +221,7 @@ pub fn state(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #[objectspell::async_trait]
         impl objectspell::AnyState for #wrapper_name {
             async fn start_listener(&self) -> Option<objectspell::tokio::task::JoinHandle<()>> {
-                let rx = {
-                    let mut lock = self.inner.lock().await;
-                    lock.state_core.take_receiver()
-                };
-                let dispatchers = {
-                    let mut lock = self.inner.lock().await;
-                    std::mem::take(&mut lock.state_core.dispatchers)
-                };
-                if let Some(r) = rx {
-                    Some(objectspell::tokio::spawn(async move {
-                        objectspell::StateCore::listen(r, &dispatchers).await;
-                    }))
-                } else {
-                    None
-                }
+                self.inner.lock().await.state_core.spawn_listener()
             }
             async fn sender(&self) -> Option<objectspell::tokio::sync::mpsc::UnboundedSender<objectspell::Signal>> {
                 let lock = self.inner.lock().await;
@@ -302,7 +300,7 @@ pub fn receiver(_args: TokenStream, input: TokenStream) -> TokenStream {
                 if let syn::FnArg::Typed(pat_type) = arg {
                     if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
                         let arg_name = &pat_ident.ident;
-                        let arg_name_str = arg_name.to_string();
+                        let arg_name_str = wire_name(arg_name);
                         let arg_ty = &*pat_type.ty;
 
                         extractors.push(quote! {
@@ -321,19 +319,20 @@ pub fn receiver(_args: TokenStream, input: TokenStream) -> TokenStream {
                 #[objectspell::async_trait]
                 impl objectspell::SignalDispatcher for #dispatcher_name {
                     fn channel(&self) -> &'static str {
-                        Box::leak(#channel_name.to_string().into_boxed_str())
+                        #channel_name
                     }
 
-                    async fn dispatch(&self, signal: &objectspell::Signal) -> bool {
-                        if signal.route == #sig_name_str {
-                            // The guard is exclusive, so handlers may take `&mut self` and
-                            // mutate the component directly.
-                            let mut state = self.state.lock().await;
-                            #(#extractors)*
-                            <#self_ty as #trait_name>::#sig_name(&mut *state #(, #call_args)*).await;
-                            return true;
-                        }
-                        false
+                    fn route(&self) -> &'static str {
+                        #sig_name_str
+                    }
+
+                    async fn dispatch(&self, signal: &objectspell::Signal) {
+                        // Registered under this channel and route, so the signal is already
+                        // the right one. The guard is exclusive, so handlers may take
+                        // `&mut self` and mutate the component directly.
+                        let mut state = self.state.lock().await;
+                        #(#extractors)*
+                        <#self_ty as #trait_name>::#sig_name(&mut *state #(, #call_args)*).await;
                     }
                 }
             });

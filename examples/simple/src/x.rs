@@ -30,6 +30,5 @@ impl Connector for X {
 
     pub async fn disconnected(&self) {
         println!("X.Connector.disconnected");
-        std::process::exit(0);
     }
 }

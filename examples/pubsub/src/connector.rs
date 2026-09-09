@@ -5,6 +5,6 @@ impl App for Connector {
     pub async fn started(&self) {}
 
     pub async fn stopped(&self) {
-        self.disconnected().await;
+        self.disconnect().await;
     }
 }
