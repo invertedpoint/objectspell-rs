@@ -35,3 +35,22 @@ pub struct DispatcherRegistration {
     pub register: fn(&mut crate::StateCore, std::sync::Arc<dyn std::any::Any + Send + Sync>),
 }
 inventory::collect!(DispatcherRegistration);
+
+/// What a component declares it sends.
+///
+/// `#[objectspell::emitter]` submits one of these per emitter block. `connect()` reads them to
+/// check that every receiver handles the whole of the channel it is named after.
+pub struct EmitterRegistration {
+    pub target_type: fn() -> std::any::TypeId,
+    pub routes: &'static [&'static str],
+}
+inventory::collect!(EmitterRegistration);
+
+/// The routes the given component type declares. Empty if it declares no signals.
+pub fn emitter_routes_of(target: std::any::TypeId) -> Vec<&'static str> {
+    inventory::iter::<EmitterRegistration>
+        .into_iter()
+        .filter(|reg| (reg.target_type)() == target)
+        .flat_map(|reg| reg.routes.iter().copied())
+        .collect()
+}

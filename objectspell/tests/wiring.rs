@@ -43,9 +43,6 @@ pub trait Pinger {
 #[objectspell::state]
 pub struct Pinger {}
 
-#[objectspell::emitter]
-pub trait Ponger {}
-
 #[objectspell::state]
 pub struct Ponger {}
 
@@ -74,6 +71,18 @@ async fn a_component_that_listens_to_nothing_gets_no_listener() {
 
     assert!(pinger.channels().await.is_empty());
     assert!(pinger.start_listener().await.is_none());
+}
+
+#[tokio::test]
+async fn a_component_reports_the_routes_it_declares() {
+    let pinger = Pinger::default().into_state();
+    assert_eq!(pinger.emitter_routes().await, ["ping"]);
+}
+
+#[tokio::test]
+async fn a_component_with_no_emitter_block_declares_no_routes() {
+    let ponger = Ponger::default().into_state();
+    assert!(ponger.emitter_routes().await.is_empty());
 }
 
 // ============================================================================

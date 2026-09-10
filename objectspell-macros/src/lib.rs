@@ -72,12 +72,14 @@ pub fn emitter(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let name = &block.ident;
 
     let mut generated_methods = Vec::new();
+    let mut route_names = Vec::new();
 
     for method in block.methods {
         let vis = &method.vis;
         let sig = &method.sig;
         let sig_name = &sig.ident;
         let sig_name_str = sig_name.to_string();
+        route_names.push(sig_name_str.clone());
 
         let mut with_params = Vec::new();
         let mut fn_args = Vec::new();
@@ -108,6 +110,13 @@ pub fn emitter(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let gen = quote! {
         impl #name {
             #(#generated_methods)*
+        }
+
+        objectspell::inventory::submit! {
+            objectspell::EmitterRegistration {
+                target_type: || std::any::TypeId::of::<#name>(),
+                routes: &[#(#route_names),*],
+            }
         }
     };
 
@@ -234,6 +243,9 @@ pub fn state(_attr: TokenStream, item: TokenStream) -> TokenStream {
             async fn emitter_name(&self) -> String {
                 let lock = self.inner.lock().await;
                 lock.emitter_core.channel_name.clone()
+            }
+            async fn emitter_routes(&self) -> Vec<&'static str> {
+                objectspell::emitter_routes_of(std::any::TypeId::of::<#name>())
             }
             async fn broadcast(&self, signal: objectspell::Signal) {
                 let lock = self.inner.lock().await;

@@ -18,6 +18,9 @@ pub trait AnyState: Send + Sync {
     /// The name of the channel this state's emitter broadcasts as.
     async fn emitter_name(&self) -> String;
 
+    /// The routes this component declares it sends.
+    async fn emitter_routes(&self) -> Vec<&'static str>;
+
     /// Broadcast a signal from this state's emitter to all connected receivers.
     async fn broadcast(&self, signal: Signal);
 
