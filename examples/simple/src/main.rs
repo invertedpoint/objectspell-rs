@@ -14,10 +14,12 @@ use x::X;
 use y::Y;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let connector = Connector::new();
     let x = X::new();
     let y = Y::new();
 
-    connector.connect((x, y)).await;
+    connector.connect((x, y)).await?;
+
+    Ok(())
 }

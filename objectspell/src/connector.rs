@@ -54,10 +54,12 @@ impl Connector {
         }
     }
 
-    /// Wire every State to the emitters it listens to, start them, and emit `connected`.
+    /// Check the wiring, connect every State to the emitters it listens to, start them, and
+    /// emit `connected`.
     ///
     /// Does not return until the topology has shut down, so it is normally the whole program.
-    pub async fn connect<C: Connectable>(self, states_tuple: C) {
+    /// A topology whose wiring is wrong is rejected before anything starts.
+    pub async fn connect<C: Connectable>(self, states_tuple: C) -> Result<(), crate::WiringError> {
         let connector = self.into_state();
 
         let mut states_vec = Vec::new();
@@ -66,6 +68,9 @@ impl Connector {
         let mut states_slice_vec: Vec<&dyn AnyState> = vec![connector.as_ref()];
         states_slice_vec.extend(states_vec.iter().map(|s| s.as_ref()));
         let states_slice = states_slice_vec.as_slice();
+
+        // 0. Nothing has been wired or started yet, so a rejected topology leaves no trace.
+        crate::wiring::validate(states_slice).await?;
 
         // 1. Collect all senders and channel names for receivers
         let mut receiver_info = Vec::new();
@@ -103,6 +108,8 @@ impl Connector {
         for handle in handles {
             let _ = handle.await;
         }
+
+        Ok(())
     }
 
     /// Emit `disconnected`. Every listening State handles it, so this stops all of them.

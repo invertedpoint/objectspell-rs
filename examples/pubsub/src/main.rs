@@ -18,12 +18,14 @@ use news::News;
 use weather::Weather;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let connector = Connector::new();
     let app = App::new();
     let weather = Weather::new();
     let news = News::new();
     let monitor = Monitor::new();
 
-    connector.connect((app, weather, news, monitor)).await;
+    connector.connect((app, weather, news, monitor)).await?;
+
+    Ok(())
 }

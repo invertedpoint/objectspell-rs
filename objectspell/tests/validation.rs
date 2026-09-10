@@ -3,6 +3,8 @@
 //! These call `validate` directly rather than `connect()`, so a broken topology needs no
 //! shutdown path and no `Connector` receiver.
 
+use std::time::Duration;
+
 use objectspell::wiring::{validate, WiringError};
 use objectspell::AnyState;
 
@@ -45,6 +47,16 @@ pub struct TypoSink {}
 #[objectspell::receiver]
 impl Sauce for TypoSink {
     pub async fn first(&self) {}
+}
+
+/// Writes a `Connector` receiver, but only half of one.
+#[objectspell::state]
+pub struct HalfConnector {}
+
+#[objectspell::receiver]
+impl Connector for HalfConnector {
+    pub async fn connected(&self) {}
+    // `disconnected` is missing.
 }
 
 #[tokio::test]
@@ -103,4 +115,43 @@ async fn two_components_with_the_same_name_are_rejected() {
         "Two connected components are both named 'Source'. Routing is by type name, so \
          component names must be unique."
     );
+}
+
+#[tokio::test]
+async fn connect_refuses_a_broken_topology() {
+    let error = objectspell::Connector::new()
+        .connect((Source::default(), PartialSink::default()))
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, WiringError::MissingRoutes { .. }));
+}
+
+#[tokio::test]
+async fn a_half_written_connector_receiver_is_rejected() {
+    let error = objectspell::Connector::new()
+        .connect((HalfConnector::default(),))
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        error.to_string(),
+        "HalfConnector.Connector does not handle every signal on channel 'Connector': \
+         missing disconnected. A receiver must define one method per signal its channel declares."
+    );
+}
+
+#[tokio::test]
+async fn a_rejected_topology_starts_nothing() {
+    // Nothing in this topology can emit `disconnected`, so had listeners been started,
+    // `connect()` would still be awaiting their handles. Returning at all is the proof that
+    // validation ran first.
+    let result = tokio::time::timeout(
+        Duration::from_secs(10),
+        objectspell::Connector::new().connect((Source::default(), PartialSink::default())),
+    )
+    .await
+    .expect("connect() returned instead of blocking on listeners that never end");
+
+    assert!(matches!(result.unwrap_err(), WiringError::MissingRoutes { .. }));
 }
