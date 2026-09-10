@@ -4,6 +4,7 @@ pub mod emitter;
 pub mod receiver;
 pub mod signal;
 pub mod state;
+pub mod wiring;
 
 extern crate self as objectspell;
 
@@ -13,6 +14,7 @@ pub use emitter::EmitterCore;
 pub use receiver::SignalDispatcher;
 pub use signal::Signal;
 pub use state::StateCore;
+pub use wiring::WiringError;
 
 pub use connector::Connector;
 
