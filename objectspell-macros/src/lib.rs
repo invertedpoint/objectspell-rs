@@ -247,6 +247,9 @@ pub fn state(_attr: TokenStream, item: TokenStream) -> TokenStream {
             async fn emitter_routes(&self) -> Vec<&'static str> {
                 objectspell::emitter_routes_of(std::any::TypeId::of::<#name>())
             }
+            async fn declared_routes(&self) -> std::collections::HashMap<String, std::collections::BTreeSet<String>> {
+                self.inner.lock().await.state_core.declared_routes().clone()
+            }
             async fn broadcast(&self, signal: objectspell::Signal) {
                 let lock = self.inner.lock().await;
                 lock.emitter_core.broadcast(signal);

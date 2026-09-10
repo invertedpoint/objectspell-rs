@@ -1,3 +1,5 @@
+use std::collections::{BTreeSet, HashMap};
+
 use tokio::task::JoinHandle;
 
 use crate::signal::Signal;
@@ -20,6 +22,9 @@ pub trait AnyState: Send + Sync {
 
     /// The routes this component declares it sends.
     async fn emitter_routes(&self) -> Vec<&'static str>;
+
+    /// The receivers this component declares, as the user wrote them: channel to routes.
+    async fn declared_routes(&self) -> HashMap<String, BTreeSet<String>>;
 
     /// Broadcast a signal from this state's emitter to all connected receivers.
     async fn broadcast(&self, signal: Signal);

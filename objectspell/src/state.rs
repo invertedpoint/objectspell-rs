@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -68,6 +68,7 @@ pub struct StateCore {
     rx: Option<mpsc::UnboundedReceiver<Signal>>,
     tx: mpsc::UnboundedSender<Signal>,
     dispatchers: Dispatchers,
+    declared: HashMap<String, BTreeSet<String>>,
     is_stopped: Arc<AtomicBool>,
     connector_installed: bool,
 }
@@ -79,6 +80,7 @@ impl StateCore {
             rx: Some(rx),
             tx,
             dispatchers: Dispatchers::new(),
+            declared: HashMap::new(),
             is_stopped: Arc::new(AtomicBool::new(false)),
             connector_installed: false,
         }
@@ -97,6 +99,15 @@ impl StateCore {
         let channel = dispatcher.channel().to_string();
         let route = dispatcher.route().to_string();
 
+        // Only what the user wrote. `install_connector_receiver` sets the flag before it
+        // registers either built-in, so those are excluded here.
+        if !self.connector_installed {
+            self.declared
+                .entry(channel.clone())
+                .or_default()
+                .insert(route.clone());
+        }
+
         self.dispatchers
             .entry(channel)
             .or_default()
@@ -108,6 +119,14 @@ impl StateCore {
     /// What channels does this state listen to?
     pub fn channels(&self) -> Vec<String> {
         self.dispatchers.keys().cloned().collect()
+    }
+
+    /// The receivers this component declares, as the user wrote them: channel to routes.
+    ///
+    /// Unlike `channels()`, this excludes the built-in Connector receiver, so it reports what
+    /// was actually written rather than what was injected.
+    pub fn declared_routes(&self) -> &HashMap<String, BTreeSet<String>> {
+        &self.declared
     }
 
     /// Give this State the built-in Connector receiver, so that it can be told to stop.

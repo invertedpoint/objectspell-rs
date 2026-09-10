@@ -85,6 +85,20 @@ async fn a_component_with_no_emitter_block_declares_no_routes() {
     assert!(ponger.emitter_routes().await.is_empty());
 }
 
+#[tokio::test]
+async fn declared_routes_exclude_the_built_in_connector_receiver() {
+    let ponger = Ponger::default().into_state();
+
+    // `channels()` sees the injected built-in; `declared_routes()` must not.
+    let mut channels = ponger.channels().await;
+    channels.sort();
+    assert_eq!(channels, ["Connector", "Pinger"]);
+
+    let declared = ponger.declared_routes().await;
+    assert_eq!(declared.keys().collect::<Vec<_>>(), ["Pinger"]);
+    assert_eq!(declared["Pinger"].iter().collect::<Vec<_>>(), ["ping"]);
+}
+
 // ============================================================================
 // Shutdown
 // ============================================================================
