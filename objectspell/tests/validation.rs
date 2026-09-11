@@ -118,6 +118,19 @@ async fn two_components_with_the_same_name_are_rejected() {
 }
 
 #[tokio::test]
+async fn the_error_reads_the_same_however_it_is_printed() {
+    let source = Source::default().into_state();
+    let sink = PartialSink::default().into_state();
+
+    let states: Vec<&dyn AnyState> = vec![source.as_ref(), sink.as_ref()];
+    let error = validate(&states).await.unwrap_err();
+
+    // Returning an error from `main` prints it with `{:?}`, which is where a user is most
+    // likely to meet it.
+    assert_eq!(format!("{error:?}"), error.to_string());
+}
+
+#[tokio::test]
 async fn connect_refuses_a_broken_topology() {
     let error = objectspell::Connector::new()
         .connect((Source::default(), PartialSink::default()))

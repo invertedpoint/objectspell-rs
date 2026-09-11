@@ -11,7 +11,6 @@ use std::fmt;
 use crate::any_state::AnyState;
 
 /// A topology that cannot work, found before anything starts.
-#[derive(Debug)]
 pub enum WiringError {
     /// Two connected components share a name, so routing between them is ambiguous.
     DuplicateName { name: String },
@@ -61,6 +60,17 @@ impl fmt::Display for WiringError {
                 missing.join(", ")
             ),
         }
+    }
+}
+
+/// Deliberately the same as `Display`.
+///
+/// Returning an error from `main` prints it with `{:?}`, and the whole value of this error is
+/// the sentence it carries. The derived form would show the fields as a struct dump in the one
+/// place a user is most likely to meet it. Every field appears in the sentence anyway.
+impl fmt::Debug for WiringError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self, f)
     }
 }
 
