@@ -33,7 +33,7 @@ async fn run(topology: impl std::future::Future<Output = Result<(), objectspell:
 
 #[objectspell::emitter]
 pub trait Starter {
-    pub async fn started();
+    async fn started();
 }
 
 #[objectspell::state]
@@ -41,16 +41,16 @@ pub struct Starter {}
 
 #[objectspell::receiver]
 impl Connector for Starter {
-    pub async fn connected(&self) {
+    async fn connected(&self) {
         self.started().await;
     }
 
-    pub async fn disconnected(&self) {}
+    async fn disconnected(&self) {}
 }
 
 #[objectspell::receiver]
 impl Starter for Connector {
-    pub async fn started(&self) {
+    async fn started(&self) {
         self.disconnect().await;
     }
 }
@@ -68,11 +68,11 @@ pub struct Watcher {
 
 #[objectspell::receiver]
 impl Connector for Watcher {
-    pub async fn connected(&self) {
+    async fn connected(&self) {
         self.log.lock().unwrap().push("connected".to_string());
     }
 
-    pub async fn disconnected(&self) {
+    async fn disconnected(&self) {
         self.log.lock().unwrap().push("disconnected".to_string());
     }
 }

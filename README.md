@@ -31,7 +31,7 @@ mod x {
     #[objectspell::emitter]
     pub trait X {
         /// Emitted once there is something to report.
-        pub async fn something_happened(message: String);
+        async fn something_happened(message: String);
     }
 
     #[objectspell::state]
@@ -39,11 +39,11 @@ mod x {
 
     #[objectspell::receiver]
     impl Connector for X {
-        pub async fn connected(&self) {
+        async fn connected(&self) {
             self.something_happened("OK Computer".to_string()).await;
         }
 
-        pub async fn disconnected(&self) {}
+        async fn disconnected(&self) {}
     }
 }
 
@@ -52,7 +52,7 @@ mod y {
     #[objectspell::emitter]
     pub trait Y {
         /// Emitted once the message has been shown.
-        pub async fn completed();
+        async fn completed();
     }
 
     #[objectspell::state]
@@ -60,7 +60,7 @@ mod y {
 
     #[objectspell::receiver]
     impl X for Y {
-        pub async fn something_happened(&self, message: String) {
+        async fn something_happened(&self, message: String) {
             println!("Y received: {message}");
             self.completed().await;
         }
@@ -73,7 +73,7 @@ mod connector {
     /// Stops everything once `Y` is done.
     #[objectspell::receiver]
     impl Y for Connector {
-        pub async fn completed(&self) {
+        async fn completed(&self) {
             self.disconnect().await;
         }
     }

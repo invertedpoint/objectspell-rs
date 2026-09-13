@@ -18,33 +18,33 @@ impl Monitor {
 
 #[objectspell::receiver]
 impl App for Monitor {
-    pub async fn started(&self) {
+    async fn started(&self) {
         self.show("App started");
     }
 
-    pub async fn stopped(&self) {
+    async fn stopped(&self) {
         self.show("App stopped");
     }
 }
 
 #[objectspell::receiver]
 impl Weather for Monitor {
-    pub async fn weather_determined(&self, message: String) {
+    async fn weather_determined(&self, message: String) {
         self.show(&format!("Weather update: {}", message));
     }
 
-    pub async fn weather_completed(&self) {
+    async fn weather_completed(&self) {
         self.show("All weather updates completed");
     }
 }
 
 #[objectspell::receiver]
 impl News for Monitor {
-    pub async fn something_happened(&self, message: String) {
+    async fn something_happened(&self, message: String) {
         self.show(&format!("News update: {}", message));
     }
 
-    pub async fn news_completed(&self) {
+    async fn news_completed(&self) {
         self.show("All news updates completed");
     }
 }

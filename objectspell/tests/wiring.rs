@@ -5,7 +5,7 @@
 
 #[objectspell::emitter]
 pub trait Pinger {
-    pub async fn ping(value: String);
+    async fn ping(value: String);
 }
 
 #[objectspell::state]
@@ -16,7 +16,7 @@ pub struct Ponger {}
 
 #[objectspell::receiver]
 impl Pinger for Ponger {
-    pub async fn ping(&self, value: String) {
+    async fn ping(&self, value: String) {
         let _ = value;
     }
 }

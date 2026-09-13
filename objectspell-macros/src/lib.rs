@@ -95,7 +95,14 @@ pub fn emitter(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut route_names = Vec::new();
 
     for method in block.methods {
-        let vis = &method.vis;
+        // A trait method has no visibility of its own — it is as visible as the trait. So an
+        // undecorated declaration means "as public as the component", not "private"; a private
+        // sender would be unreachable from anywhere but its own module. An explicit visibility
+        // is still honoured, so `pub(crate)` narrows it on purpose.
+        let vis = match &method.vis {
+            Visibility::Inherited => quote! { pub },
+            explicit => quote! { #explicit },
+        };
         let sig = &method.sig;
         let sig_name = &sig.ident;
         let sig_name_str = sig_name.to_string();
@@ -209,7 +216,15 @@ pub fn state(_attr: TokenStream, item: TokenStream) -> TokenStream {
         .unwrap();
         struct_def.fields = syn::Fields::Named(new_fields);
     } else {
-        panic!("Tuple structs are not supported by #[objectspell::state]");
+        // A `syn::Error` carries a span, so the user gets an ordinary compile error pointing at
+        // their struct rather than a macro panic with no source location.
+        return syn::Error::new_spanned(
+            &struct_def,
+            "#[objectspell::state] needs a struct with named fields, or no fields at all. \
+             A tuple struct has nowhere to put the queue and emitter it injects.",
+        )
+        .to_compile_error()
+        .into();
     }
 
     let wrapper_name = format_ident!("{}AnyStateWrapper", name);

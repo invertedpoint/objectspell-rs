@@ -11,7 +11,7 @@ what you see when it is wrong.
 // in y.rs — Y listens to X
 #[objectspell::receiver]
 impl X for Y {
-    pub async fn something_happened(&self, message: String) {
+    async fn something_happened(&self, message: String) {
         self.show(&message);
     }
 }

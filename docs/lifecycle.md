@@ -27,11 +27,11 @@ Connector::new().connect((X::default(), Y::default())).await?;
 // in x.rs
 #[objectspell::receiver]
 impl Connector for X {
-    pub async fn connected(&self) {
+    async fn connected(&self) {
         self.action().await;
     }
 
-    pub async fn disconnected(&self) {}
+    async fn disconnected(&self) {}
 }
 ```
 
@@ -50,7 +50,7 @@ Any component can end the program by calling `disconnect()` on the Connector:
 // in connector.rs
 #[objectspell::receiver]
 impl Y for Connector {
-    pub async fn completed(&self) {
+    async fn completed(&self) {
         self.disconnect().await;
     }
 }

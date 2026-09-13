@@ -10,8 +10,8 @@ use objectspell::AnyState;
 
 #[objectspell::emitter]
 pub trait Source {
-    pub async fn first();
-    pub async fn second();
+    async fn first();
+    async fn second();
 }
 
 #[objectspell::state]
@@ -23,8 +23,8 @@ pub struct GoodSink {}
 
 #[objectspell::receiver]
 impl Source for GoodSink {
-    pub async fn first(&self) {}
-    pub async fn second(&self) {}
+    async fn first(&self) {}
+    async fn second(&self) {}
 }
 
 /// Handles only half of what `Source` declares.
@@ -33,7 +33,7 @@ pub struct PartialSink {}
 
 #[objectspell::receiver]
 impl Source for PartialSink {
-    pub async fn first(&self) {}
+    async fn first(&self) {}
 }
 
 /// Named after a component that does not exist — the shape of a typo.
@@ -46,7 +46,7 @@ pub struct TypoSink {}
 
 #[objectspell::receiver]
 impl Sauce for TypoSink {
-    pub async fn first(&self) {}
+    async fn first(&self) {}
 }
 
 /// Writes a `Connector` receiver, but only half of one.
@@ -55,7 +55,7 @@ pub struct HalfConnector {}
 
 #[objectspell::receiver]
 impl Connector for HalfConnector {
-    pub async fn connected(&self) {}
+    async fn connected(&self) {}
     // `disconnected` is missing.
 }
 

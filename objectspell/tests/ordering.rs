@@ -33,8 +33,8 @@ async fn run(topology: impl std::future::Future<Output = Result<(), objectspell:
 
 #[objectspell::emitter]
 pub trait Producer {
-    pub async fn item(value: String);
-    pub async fn done();
+    async fn item(value: String);
+    async fn done();
 }
 
 #[objectspell::state]
@@ -42,14 +42,14 @@ pub struct Producer {}
 
 #[objectspell::receiver]
 impl Connector for Producer {
-    pub async fn connected(&self) {
+    async fn connected(&self) {
         for value in 0..5 {
             self.item(value.to_string()).await;
         }
         self.done().await;
     }
 
-    pub async fn disconnected(&self) {}
+    async fn disconnected(&self) {}
 }
 
 #[objectspell::state]
@@ -59,18 +59,18 @@ pub struct Consumer {
 
 #[objectspell::receiver]
 impl Producer for Consumer {
-    pub async fn item(&self, value: String) {
+    async fn item(&self, value: String) {
         self.log.lock().unwrap().push(value);
     }
 
-    pub async fn done(&self) {}
+    async fn done(&self) {}
 }
 
 #[objectspell::receiver]
 impl Producer for Connector {
-    pub async fn item(&self, _value: String) {}
+    async fn item(&self, _value: String) {}
 
-    pub async fn done(&self) {
+    async fn done(&self) {
         self.disconnect().await;
     }
 }

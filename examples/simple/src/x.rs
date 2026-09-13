@@ -2,7 +2,7 @@
 
 #[objectspell::emitter]
 pub trait X {
-    pub async fn something_happened(message: String);
+    async fn something_happened(message: String);
 }
 
 #[objectspell::state]
@@ -23,12 +23,12 @@ impl X {
 
 #[objectspell::receiver]
 impl Connector for X {
-    pub async fn connected(&self) {
+    async fn connected(&self) {
         println!("X.Connector.connected");
         self.action().await;
     }
 
-    pub async fn disconnected(&self) {
+    async fn disconnected(&self) {
         println!("X.Connector.disconnected");
     }
 }

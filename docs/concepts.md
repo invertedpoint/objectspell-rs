@@ -10,7 +10,7 @@ An emitter declares the signals a component can send.
 #[objectspell::emitter]
 pub trait X {
     /// Emitted once there is something to report.
-    pub async fn something_happened(message: String);
+    async fn something_happened(message: String);
 }
 ```
 
@@ -20,6 +20,9 @@ struct of the same name.
 
 The `trait` keyword is borrowed syntax, not a real trait: the block is discarded and replaced
 with an inherent `impl X`. Nothing implements it, and you never name it in a bound.
+
+Declarations take no visibility, the same as real trait methods, and the generated senders are
+public. Write one explicitly — `pub(crate) async fn internal_only();` — to narrow that.
 
 ## State
 
@@ -55,7 +58,7 @@ says which component it listens to**.
 // Y listens to X
 #[objectspell::receiver]
 impl X for Y {
-    pub async fn something_happened(&self, message: String) {
+    async fn something_happened(&self, message: String) {
         println!("Y received: {message}");
     }
 }

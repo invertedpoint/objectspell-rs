@@ -1,7 +1,7 @@
 #[objectspell::emitter]
 pub trait App {
-    pub async fn started();
-    pub async fn stopped();
+    async fn started();
+    async fn stopped();
 }
 
 #[objectspell::state]
@@ -29,27 +29,27 @@ impl App {
 
 #[objectspell::receiver]
 impl Connector for App {
-    pub async fn connected(&self) {
+    async fn connected(&self) {
         self.started().await;
     }
 
-    pub async fn disconnected(&self) {}
+    async fn disconnected(&self) {}
 }
 
 #[objectspell::receiver]
 impl Weather for App {
-    pub async fn weather_determined(&self, _message: String) {}
+    async fn weather_determined(&self, _message: String) {}
 
-    pub async fn weather_completed(&mut self) {
+    async fn weather_completed(&mut self) {
         self.use_completion("Weather").await;
     }
 }
 
 #[objectspell::receiver]
 impl News for App {
-    pub async fn something_happened(&self, _message: String) {}
+    async fn something_happened(&self, _message: String) {}
 
-    pub async fn news_completed(&mut self) {
+    async fn news_completed(&mut self) {
         self.use_completion("News").await;
     }
 }

@@ -2,8 +2,8 @@ use crate::util::rand_index;
 
 #[objectspell::emitter]
 pub trait Weather {
-    pub async fn weather_determined(message: String);
-    pub async fn weather_completed();
+    async fn weather_determined(message: String);
+    async fn weather_completed();
 }
 
 #[objectspell::state]
@@ -22,7 +22,7 @@ impl Weather {
 
 #[objectspell::receiver]
 impl App for Weather {
-    pub async fn started(&self) {
+    async fn started(&self) {
         for _ in 0..5 {
             let condition = self.weather_conditions[rand_index(self.weather_conditions.len())];
             let msg = format!("Current weather: {}", condition);
@@ -34,5 +34,5 @@ impl App for Weather {
         self.weather_completed().await;
     }
 
-    pub async fn stopped(&self) {}
+    async fn stopped(&self) {}
 }

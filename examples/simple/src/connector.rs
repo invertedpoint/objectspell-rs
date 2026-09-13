@@ -4,7 +4,7 @@ use objectspell::Connector;
 
 #[objectspell::receiver]
 impl Y for Connector {
-    pub async fn completed(&self) {
+    async fn completed(&self) {
         self.disconnect().await;
     }
 }

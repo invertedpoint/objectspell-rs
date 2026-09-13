@@ -2,7 +2,7 @@
 
 #[objectspell::emitter]
 pub trait Y {
-    pub async fn completed();
+    async fn completed();
 }
 
 #[objectspell::state]
@@ -22,7 +22,7 @@ impl Y {
 
 #[objectspell::receiver]
 impl X for Y {
-    pub async fn something_happened(&self, message: String) {
+    async fn something_happened(&self, message: String) {
         self.show(&message);
         self.completed().await;
     }

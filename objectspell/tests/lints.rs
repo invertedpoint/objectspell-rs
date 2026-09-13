@@ -10,7 +10,7 @@
 #[objectspell::emitter]
 pub trait Speaker {
     /// Emitted once there is something to say.
-    pub async fn spoke(word: String);
+    async fn spoke(word: String);
 }
 
 /// A component that speaks.
@@ -24,7 +24,7 @@ pub struct Listener {}
 #[objectspell::receiver]
 impl Speaker for Listener {
     /// Takes down whatever was said.
-    pub async fn spoke(&self, word: String) {
+    async fn spoke(&self, word: String) {
         let _ = word;
     }
 }

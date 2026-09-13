@@ -2,8 +2,8 @@ use crate::util::rand_index;
 
 #[objectspell::emitter]
 pub trait News {
-    pub async fn something_happened(message: String);
-    pub async fn news_completed();
+    async fn something_happened(message: String);
+    async fn news_completed();
 }
 
 #[objectspell::state]
@@ -22,7 +22,7 @@ impl News {
 
 #[objectspell::receiver]
 impl App for News {
-    pub async fn started(&self) {
+    async fn started(&self) {
         for _ in 0..5 {
             let item = self.news_items[rand_index(self.news_items.len())];
             let msg = format!("{}: Something interesting happened!", item);
@@ -34,5 +34,5 @@ impl App for News {
         self.news_completed().await;
     }
 
-    pub async fn stopped(&self) {}
+    async fn stopped(&self) {}
 }

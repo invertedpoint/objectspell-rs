@@ -20,7 +20,7 @@
 //! #[objectspell::emitter]
 //! pub trait Asker {
 //!     /// Emitted once the topology is running.
-//!     pub async fn asked(question: String);
+//!     async fn asked(question: String);
 //! }
 //!
 //! /// Asks as soon as everything is connected.
@@ -29,11 +29,11 @@
 //!
 //! #[objectspell::receiver]
 //! impl Connector for Asker {
-//!     pub async fn connected(&self) {
+//!     async fn connected(&self) {
 //!         self.asked("ready?".to_string()).await;
 //!     }
 //!
-//!     pub async fn disconnected(&self) {}
+//!     async fn disconnected(&self) {}
 //! }
 //!
 //! /// Listens for questions.
@@ -42,7 +42,7 @@
 //!
 //! #[objectspell::receiver]
 //! impl Asker for Answerer {
-//!     pub async fn asked(&self, question: String) {
+//!     async fn asked(&self, question: String) {
 //!         println!("heard: {question}");
 //!     }
 //! }
@@ -50,7 +50,7 @@
 //! // A receiver on the Connector itself: one question is all this program needed.
 //! #[objectspell::receiver]
 //! impl Asker for Connector {
-//!     pub async fn asked(&self, _question: String) {
+//!     async fn asked(&self, _question: String) {
 //!         self.disconnect().await;
 //!     }
 //! }

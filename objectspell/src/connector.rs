@@ -42,8 +42,8 @@ impl Connectable for () {
 
 #[objectspell::emitter]
 pub trait Connector {
-    pub async fn connected();
-    pub async fn disconnected();
+    async fn connected();
+    async fn disconnected();
 }
 
 /// Starts and stops a topology.
