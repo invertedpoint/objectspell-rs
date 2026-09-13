@@ -1,7 +1,9 @@
 // Connector module.
 use crate::AnyState;
 
+/// What `connect()` accepts: a component, or a tuple of up to sixteen of them.
 pub trait Connectable {
+    /// Turn each component into a runnable state and collect them.
     fn into_states(self, vec: &mut Vec<Box<dyn AnyState>>);
 }
 
@@ -44,10 +46,15 @@ pub trait Connector {
     pub async fn disconnected();
 }
 
+/// Starts and stops a topology.
+///
+/// `connect` checks the wiring, starts every component, and emits `connected`. It does not
+/// return until the topology has shut down, so it is normally the whole program.
 #[objectspell::state]
 pub struct Connector {}
 
 impl Connector {
+    /// Create a Connector.
     pub fn new() -> Self {
         Self {
             ..Default::default()

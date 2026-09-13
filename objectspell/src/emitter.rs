@@ -7,11 +7,13 @@ use crate::signal::Signal;
 /// Each emitter has a channel name — the name of the component it belongs to — and a list of
 /// senders, one per receiver connected to it.
 pub struct EmitterCore {
+    /// The name signals from this emitter travel under — the component's own name.
     pub channel_name: String,
     senders: Vec<mpsc::UnboundedSender<Signal>>,
 }
 
 impl EmitterCore {
+    /// Create an emitter that broadcasts under the given component name.
     pub fn new(channel_name: impl Into<String>) -> Self {
         Self {
             channel_name: channel_name.into(),

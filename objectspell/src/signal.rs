@@ -12,8 +12,11 @@ use std::sync::Arc;
 /// receiver, so each argument is held behind an `Arc` and cloned out on the receiving side.
 #[derive(Clone)]
 pub struct Signal {
+    /// The emitting component's name.
     pub channel: String,
+    /// The signal's own name.
     pub route: String,
+    /// The signal's arguments, keyed by parameter name.
     pub message: HashMap<String, Arc<dyn Any + Send + Sync>>,
 }
 

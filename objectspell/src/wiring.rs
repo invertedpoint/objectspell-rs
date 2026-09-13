@@ -13,19 +13,28 @@ use crate::any_state::AnyState;
 /// A topology that cannot work, found before anything starts.
 pub enum WiringError {
     /// Two connected components share a name, so routing between them is ambiguous.
-    DuplicateName { name: String },
+    DuplicateName {
+        /// The name they both have.
+        name: String,
+    },
 
     /// A receiver is named after a channel no connected component emits on.
     UnknownChannel {
+        /// The component the receiver was written on.
         component: String,
+        /// The name the receiver was given.
         channel: String,
+        /// Every channel the topology does have, sorted.
         connected: Vec<String>,
     },
 
     /// A receiver does not handle every signal its channel declares.
     MissingRoutes {
+        /// The component the receiver was written on.
         component: String,
+        /// The channel it is named after.
         channel: String,
+        /// The routes it leaves unhandled, sorted.
         missing: Vec<String>,
     },
 }

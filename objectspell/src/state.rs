@@ -74,6 +74,7 @@ pub struct StateCore {
 }
 
 impl StateCore {
+    /// Create a core with an empty queue and no receivers.
     pub fn new() -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
         Self {

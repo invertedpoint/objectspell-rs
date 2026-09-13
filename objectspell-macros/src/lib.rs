@@ -1,3 +1,13 @@
+//! The three attribute macros behind `objectspell`.
+//!
+//! Use them through the `objectspell` crate — `#[objectspell::emitter]`,
+//! `#[objectspell::state]`, `#[objectspell::receiver]` — which re-exports all three and is the
+//! crate their generated code names. Depending on this crate directly will not work.
+//!
+//! See the [`objectspell`](https://docs.rs/objectspell) documentation for what they do.
+
+#![warn(missing_docs)]
+
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
@@ -20,20 +30,23 @@ fn wire_name(ident: &syn::Ident) -> String {
 // ============================================================================
 
 struct EmitterMethod {
+    attrs: Vec<syn::Attribute>,
     vis: Visibility,
     sig: Signature,
 }
 
 impl Parse for EmitterMethod {
     fn parse(input: ParseStream) -> Result<Self> {
+        let attrs = input.call(syn::Attribute::parse_outer)?;
         let vis: Visibility = input.parse()?;
         let sig: Signature = input.parse()?;
         input.parse::<Token![;]>()?;
-        Ok(EmitterMethod { vis, sig })
+        Ok(EmitterMethod { attrs, vis, sig })
     }
 }
 
 struct EmitterBlock {
+    attrs: Vec<syn::Attribute>,
     _vis: Visibility,
     _trait_token: Token![trait],
     ident: syn::Ident,
@@ -42,6 +55,7 @@ struct EmitterBlock {
 
 impl Parse for EmitterBlock {
     fn parse(input: ParseStream) -> Result<Self> {
+        let attrs = input.call(syn::Attribute::parse_outer)?;
         let _vis: Visibility = input.parse()?;
         let _trait_token: Token![trait] = input.parse()?;
         let ident: syn::Ident = input.parse()?;
@@ -55,12 +69,18 @@ impl Parse for EmitterBlock {
         }
 
         Ok(EmitterBlock {
+            attrs,
             _vis,
             _trait_token,
             ident,
             methods,
         })
     }
+}
+
+/// Whether the user already wrote a doc comment, so the macro should not add one of its own.
+fn has_doc(attrs: &[syn::Attribute]) -> bool {
+    attrs.iter().any(|attr| attr.path().is_ident("doc"))
 }
 
 /// The `#[objectspell::emitter]` macro parses a `trait StructName { ... }` definition.
@@ -97,7 +117,20 @@ pub fn emitter(_attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
 
+        // Whatever the user wrote on the declaration travels to the generated method — the
+        // declaration is discarded, so this is the only place their doc comment can land. A
+        // generated method with no doc at all would trip `missing_docs` in the user's crate.
+        let attrs = &method.attrs;
+        let fallback_doc = if has_doc(attrs) {
+            quote! {}
+        } else {
+            let text = format!("Emits the `{sig_name_str}` signal.");
+            quote! { #[doc = #text] }
+        };
+
         generated_methods.push(quote! {
+            #(#attrs)*
+            #fallback_doc
             #vis async fn #sig_name(#(#fn_args),*) {
                 self.emitter_core.broadcast(
                     objectspell::Signal::new(self.emitter_core.channel_name.clone(), #sig_name_str)
@@ -107,7 +140,10 @@ pub fn emitter(_attr: TokenStream, item: TokenStream) -> TokenStream {
         });
     }
 
+    let block_attrs = &block.attrs;
+
     let gen = quote! {
+        #(#block_attrs)*
         impl #name {
             #(#generated_methods)*
         }
@@ -148,20 +184,25 @@ pub fn state(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         use syn::parse::Parser;
+        // `pub` so generated code can reach them, `doc(hidden)` because they are plumbing:
+        // they would otherwise appear on the user's own documentation, and trip `missing_docs`
+        // in a crate that denies it.
         fields.named.push(
             syn::Field::parse_named
-                .parse2(quote! { pub state_core: objectspell::StateCore })
+                .parse2(quote! { #[doc(hidden)] pub state_core: objectspell::StateCore })
                 .unwrap(),
         );
         fields.named.push(
             syn::Field::parse_named
-                .parse2(quote! { pub emitter_core: objectspell::EmitterCore })
+                .parse2(quote! { #[doc(hidden)] pub emitter_core: objectspell::EmitterCore })
                 .unwrap(),
         );
     } else if let syn::Fields::Unit = struct_def.fields {
         let new_fields: syn::FieldsNamed = syn::parse2(quote! {
             {
+                #[doc(hidden)]
                 pub state_core: objectspell::StateCore,
+                #[doc(hidden)]
                 pub emitter_core: objectspell::EmitterCore,
             }
         })
@@ -186,6 +227,10 @@ pub fn state(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
             }
 
+            /// Turn this component into one the Connector can connect.
+            ///
+            /// Attaches every receiver written for it, then the built-in Connector receiver
+            /// that lets `disconnect()` stop it. Normally called for you by `connect()`.
             pub fn into_state(self) -> Box<dyn objectspell::AnyState> {
                 let arc_self = std::sync::Arc::new(objectspell::tokio::sync::Mutex::new(self));
                 let arc_any = std::sync::Arc::clone(&arc_self) as std::sync::Arc<dyn std::any::Any + Send + Sync>;
