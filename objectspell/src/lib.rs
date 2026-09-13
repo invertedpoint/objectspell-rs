@@ -134,6 +134,15 @@ pub struct EmitterRegistration {
 }
 inventory::collect!(EmitterRegistration);
 
+/// Compiles and runs the README's code blocks as doctests.
+///
+/// The README is not the crate documentation — this crate has its own, tuned for docs.rs — but
+/// its quick start is real code and has to keep working. Attaching it to a `cfg(doctest)` item
+/// means `cargo test --doc` checks it without it becoming the front page here.
+#[doc = include_str!("../../README.md")]
+#[cfg(doctest)]
+struct ReadmeDoctests;
+
 /// The routes the given component type declares. Empty if it declares no signals.
 pub fn emitter_routes_of(target: std::any::TypeId) -> Vec<&'static str> {
     inventory::iter::<EmitterRegistration>
