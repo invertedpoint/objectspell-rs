@@ -118,7 +118,9 @@ The same program split across real files is in [`examples/simple`](examples/simp
 - [Lifecycle](docs/lifecycle.md) — starting up, shutting down, and message order
 - [Limitations](docs/limitations.md) — what this library does not do
 
-Runnable examples live in [`examples/`](examples).
+Runnable examples live in [`examples/`](examples). Changes are recorded in
+[CHANGELOG.md](CHANGELOG.md), and [CONTRIBUTING.md](CONTRIBUTING.md) covers the checks and how
+the test suite is laid out.
 
 ## License
 
