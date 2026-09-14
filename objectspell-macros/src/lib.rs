@@ -345,7 +345,7 @@ pub fn receiver(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     let self_ty_str_clean = quote!(#self_ty).to_string().replace(" ", "");
     let trait_name = format_ident!("{}ReceiverExtension{}", self_ty_str_clean, channel_name);
-    
+
     let mut trait_items = Vec::new();
     for item in impl_block.items.iter_mut() {
         if let ImplItem::Fn(method) = item {
@@ -354,9 +354,13 @@ pub fn receiver(_args: TokenStream, input: TokenStream) -> TokenStream {
             trait_items.push(quote! { #sig; });
         }
     }
-    
+
     let trait_path: syn::Path = syn::parse_str(&trait_name.to_string()).unwrap();
-    impl_block.trait_ = Some((None, trait_path, Token![for](proc_macro2::Span::call_site())));
+    impl_block.trait_ = Some((
+        None,
+        trait_path,
+        Token![for](proc_macro2::Span::call_site()),
+    ));
 
     let mut dispatchers = Vec::new();
     let mut register_calls = Vec::new();
@@ -429,7 +433,7 @@ pub fn receiver(_args: TokenStream, input: TokenStream) -> TokenStream {
         trait #trait_name {
             #(#trait_items)*
         }
-        
+
         #impl_block
 
         #(#dispatchers)*

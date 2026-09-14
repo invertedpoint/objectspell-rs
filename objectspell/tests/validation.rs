@@ -166,5 +166,8 @@ async fn a_rejected_topology_starts_nothing() {
     .await
     .expect("connect() returned instead of blocking on listeners that never end");
 
-    assert!(matches!(result.unwrap_err(), WiringError::MissingRoutes { .. }));
+    assert!(matches!(
+        result.unwrap_err(),
+        WiringError::MissingRoutes { .. }
+    ));
 }
