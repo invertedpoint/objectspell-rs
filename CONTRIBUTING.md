@@ -87,6 +87,11 @@ exact version, so the macro crate has to land first.
 
 Before tagging, move `CHANGELOG.md`'s `## Unreleased` section to the new version number.
 
+The workflow checks crates.io first and skips the upload if that version is already there, so
+re-running a release is safe and the `v0.1.0` tag does not fail on the version that was published
+by hand. If it finds *some* but not all of the crates at that version — a half-finished release —
+it stops rather than guessing, and the rest has to go up manually.
+
 **If `cargo publish --workspace --dry-run` fails locally** with errors inside macro-generated
 code — missing trait methods, calls to functions that no longer exist — suspect a stale compiled
 proc-macro before suspecting the crate. `cargo clean` and try again. CI starts from an empty

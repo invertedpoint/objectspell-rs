@@ -59,7 +59,42 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
 
+      # 0.1.0 was published by hand, because Trusted Publishing is configured on
+      # a crate's settings page and so cannot exist before the crate does. Its
+      # tag would otherwise fail here on "already uploaded". Re-running a release
+      # after a partial failure hits the same case.
+      - name: Is this version already on crates.io?
+        id: published
+        run: |
+          version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          published=0
+          total=0
+
+          for crate in objectspell-macros objectspell; do
+            total=$((total + 1))
+            if curl -sf -H "User-Agent: objectspell-release" \
+                 "https://crates.io/api/v1/crates/${crate}/${version}" > /dev/null; then
+              echo "${crate} ${version}: already on crates.io"
+              published=$((published + 1))
+            else
+              echo "${crate} ${version}: not yet published"
+            fi
+          done
+
+          if [ "${published}" -eq 0 ]; then
+            echo "all=false" >> "$GITHUB_OUTPUT"
+          elif [ "${published}" -eq "${total}" ]; then
+            echo "all=true" >> "$GITHUB_OUTPUT"
+          else
+            # A half-finished release. Skipping would abandon the rest and
+            # publishing would fail on the part that landed, so stop and say so.
+            echo "::error::${published} of ${total} crates are already at ${version}." \
+                 "Finish the release by hand; this workflow will not guess."
+            exit 1
+          fi
+
       - name: Authenticate to crates.io
+        if: steps.published.outputs.all != 'true'
         uses: rust-lang/crates-io-auth-action@v1
         id: auth
 
@@ -67,6 +102,11 @@ jobs:
       # `objectspell-macros` at an exact version, so the macro crate has to land
       # first and be visible before the other is uploaded.
       - name: Publish
+        if: steps.published.outputs.all != 'true'
         run: cargo publish --workspace
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+      - name: Already published
+        if: steps.published.outputs.all == 'true'
+        run: echo "Nothing to upload — this version is already on crates.io."
