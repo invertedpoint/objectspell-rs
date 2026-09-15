@@ -1,5 +1,6 @@
 # ObjectSpell
 
+[![CI](https://github.com/invertedpoint/objectspell-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/invertedpoint/objectspell-rs/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/objectspell.svg)](https://crates.io/crates/objectspell)
 [![docs.rs](https://docs.rs/objectspell/badge.svg)](https://docs.rs/objectspell)
 [![license](https://img.shields.io/crates/l/objectspell.svg)](LICENSE)

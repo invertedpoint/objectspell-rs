@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Formatting
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # Includes the doctests, which compile and run both the crate-level
+      # example and the README's quick start.
+      - name: Tests
+        run: cargo test --workspace
+
+      - name: Rustdoc
+        run: cargo doc --no-deps --workspace
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+      # Both examples must terminate on their own. Neither calls
+      # `std::process::exit`, so a job that hangs here means shutdown is broken —
+      # which is exactly what these are here to catch.
+      - name: Example - simple
+        run: cargo run -p simple
+        timeout-minutes: 2
+
+      - name: Example - pubsub
+        run: cargo run -p pubsub
+        timeout-minutes: 2
+
+  msrv:
+    name: MSRV
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Must match `rust-version` in the workspace manifest.
+      - uses: dtolnay/rust-toolchain@1.82
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Build and test only. Lint and format output shifts between toolchain
+      # versions, so pinning those here would fail for reasons unrelated to
+      # whether the crate still compiles on its oldest supported Rust.
+      - name: Tests
+        run: cargo test --workspace
+
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      # Packages both crates and verifies `objectspell` against the packaged
+      # `objectspell-macros` rather than the path dependency — the thing that
+      # would otherwise only be discovered during a release that cannot be undone.
+      - name: Publish dry run
+        run: cargo publish --workspace --dry-run

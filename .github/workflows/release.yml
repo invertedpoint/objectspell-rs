@@ -1,0 +1,72 @@
+name: Release
+
+# Publishes to crates.io when a version tag is pushed:
+#
+#   git tag v0.1.1 && git push origin v0.1.1
+#
+# The first release is published by hand. Trusted Publishing is configured on a
+# crate's own settings page on crates.io, which needs the crate to exist — so
+# 0.1.0 goes up from a workstation, and this workflow takes over from 0.1.1.
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: crates-io
+    permissions:
+      # Mints the short-lived OIDC token crates.io trades for a publish token.
+      # No API token is stored anywhere.
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      # A mis-tagged release cannot be undone any more than a wrong one can, so
+      # the tag and the manifest have to agree before anything is built.
+      - name: Tag matches the workspace version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          if [ "$tag" != "$version" ]; then
+            echo "tag ${tag} does not match workspace version ${version}" >&2
+            exit 1
+          fi
+          echo "releasing ${version}"
+
+      # A published version can never be replaced, only yanked. The checks run
+      # again here rather than trusting that the tagged commit was green on main.
+      - name: Formatting
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --workspace
+
+      - name: Rustdoc
+        run: cargo doc --no-deps --workspace
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+      - name: Authenticate to crates.io
+        uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+
+      # Publishes both crates in dependency order: `objectspell` pins
+      # `objectspell-macros` at an exact version, so the macro crate has to land
+      # first and be visible before the other is uploaded.
+      - name: Publish
+        run: cargo publish --workspace
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}

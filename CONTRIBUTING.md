@@ -67,6 +67,31 @@ Three more things worth knowing:
 - Wrap any topology that calls `connect()` in `tokio::time::timeout`. A shutdown bug otherwise
   hangs the suite instead of failing it.
 
+## Releasing
+
+CI runs the checks above on stable, runs the tests again on the declared MSRV, and does a
+`cargo publish --workspace --dry-run` on every push to `main`.
+
+A release is a tag:
+
+```bash
+git tag v0.1.1 && git push origin v0.1.1
+```
+
+`.github/workflows/release.yml` refuses a tag that disagrees with the workspace version, re-runs
+every check, and publishes. It re-runs them rather than trusting that the tagged commit was green
+because **a published version can never be replaced, only yanked**.
+
+`cargo publish --workspace` handles the ordering: `objectspell` pins `objectspell-macros` at an
+exact version, so the macro crate has to land first.
+
+Before tagging, move `CHANGELOG.md`'s `## Unreleased` section to the new version number.
+
+**If `cargo publish --workspace --dry-run` fails locally** with errors inside macro-generated
+code — missing trait methods, calls to functions that no longer exist — suspect a stale compiled
+proc-macro before suspecting the crate. `cargo clean` and try again. CI starts from an empty
+target directory and does not hit this.
+
 ## Notes
 
 - Keep the dependency count at four. `Display` and `Error` are written by hand rather than
