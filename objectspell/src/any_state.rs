@@ -1,7 +1,6 @@
 use std::collections::{BTreeSet, HashMap};
 
-use tokio::task::JoinHandle;
-
+use crate::listener::ListenerHandle;
 use crate::signal::Signal;
 
 /// Trait to allow abstracting over typed States in the Connector.
@@ -9,7 +8,7 @@ use crate::signal::Signal;
 #[async_trait::async_trait]
 pub trait AnyState: Send + Sync {
     /// Start the signal listening loop.
-    async fn start_listener(&self) -> Option<JoinHandle<()>>;
+    async fn start_listener(&self) -> Option<ListenerHandle>;
 
     /// The sender half of the state's channel. Used by emitters to broadcast signals here.
     async fn sender(&self) -> Option<tokio::sync::mpsc::UnboundedSender<Signal>>;

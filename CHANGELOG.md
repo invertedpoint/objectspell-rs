@@ -3,6 +3,14 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- **Listeners run in browsers.** On `wasm32` a listener is spawned onto the browser's event loop
+  rather than Tokio. `AnyState::start_listener` now returns `Option<ListenerHandle>`; code that
+  implements `AnyState` by hand must follow. Components written with the macros are unaffected.
+
 ## 0.1.0 - 2026-09-15
 
 First release.

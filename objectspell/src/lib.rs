@@ -79,6 +79,8 @@ pub mod any_state;
 pub mod connector;
 /// The sending half of a component.
 pub mod emitter;
+/// Running a listener on this target's executor.
+pub mod listener;
 /// The receiving half of a component.
 pub mod receiver;
 /// What travels between components.
@@ -93,6 +95,7 @@ extern crate self as objectspell;
 // Re-export core types
 pub use any_state::AnyState;
 pub use emitter::EmitterCore;
+pub use listener::ListenerHandle;
 pub use receiver::SignalDispatcher;
 pub use signal::Signal;
 pub use state::StateCore;

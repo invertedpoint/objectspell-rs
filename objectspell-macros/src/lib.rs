@@ -289,7 +289,7 @@ pub fn state(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
         #[objectspell::async_trait]
         impl objectspell::AnyState for #wrapper_name {
-            async fn start_listener(&self) -> Option<objectspell::tokio::task::JoinHandle<()>> {
+            async fn start_listener(&self) -> Option<objectspell::ListenerHandle> {
                 self.inner.lock().await.state_core.spawn_listener()
             }
             async fn sender(&self) -> Option<objectspell::tokio::sync::mpsc::UnboundedSender<objectspell::Signal>> {

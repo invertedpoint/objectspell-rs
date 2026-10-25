@@ -3,8 +3,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use tokio::sync::mpsc;
-use tokio::task::JoinHandle;
 
+use crate::listener::ListenerHandle;
 use crate::receiver::SignalDispatcher;
 use crate::signal::Signal;
 
@@ -152,7 +152,7 @@ impl StateCore {
     /// Returns `None` for a State with no receivers. Such a State holds a sender to its own
     /// queue for as long as it is connected, so a listener started for it would never end and
     /// would keep the whole topology from shutting down.
-    pub fn spawn_listener(&mut self) -> Option<JoinHandle<()>> {
+    pub fn spawn_listener(&mut self) -> Option<ListenerHandle> {
         if self.dispatchers.is_empty() {
             return None;
         }
@@ -161,7 +161,7 @@ impl StateCore {
         let dispatchers = std::mem::take(&mut self.dispatchers);
         let is_stopped = Arc::clone(&self.is_stopped);
 
-        Some(tokio::spawn(async move {
+        Some(ListenerHandle::spawn(async move {
             Self::listen(rx, dispatchers, is_stopped).await;
         }))
     }
