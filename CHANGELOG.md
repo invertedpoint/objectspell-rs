@@ -5,6 +5,12 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Added
+
+- **The `serde` feature.** Every emitter also registers an encoder that turns one of its signals
+  into a serialisable tuple of arguments (`objectspell::encoding`). Off by default. A signal
+  with a parameter that is not `serde::Serialize` gets no encoder, and `serializable` says so.
+
 ### Changed
 
 - **Listeners run in browsers.** On `wasm32` a listener is spawned onto the browser's event loop
