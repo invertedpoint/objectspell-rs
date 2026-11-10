@@ -113,7 +113,7 @@ impl Connector {
             .await;
 
         for handle in handles {
-            let _ = handle.await;
+            handle.finished().await;
         }
 
         Ok(())

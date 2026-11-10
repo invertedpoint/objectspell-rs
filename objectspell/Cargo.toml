@@ -18,6 +18,16 @@ objectspell-macros = { path = "../objectspell-macros", version = "=0.1.0" }
 tokio = { version = "1", features = ["rt", "sync"] }
 async-trait = "0.1"
 inventory = "0.3.22"
+serde = { version = "1", optional = true }
+erased-serde = { version = "0.4", optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4"
+
+[features]
+# Every emitter also registers an encoder for its signals; see `objectspell::encoding`.
+serde = ["dep:serde", "dep:erased-serde"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "macros", "time"] }
+serde_json = "1"

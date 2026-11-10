@@ -93,6 +93,7 @@ pub fn emitter(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let mut generated_methods = Vec::new();
     let mut route_names = Vec::new();
+    let mut encoder_routes = Vec::new();
 
     for method in block.methods {
         // A trait method has no visibility of its own — it is as visible as the trait. So an
@@ -109,6 +110,7 @@ pub fn emitter(_attr: TokenStream, item: TokenStream) -> TokenStream {
         route_names.push(sig_name_str.clone());
 
         let mut with_params = Vec::new();
+        let mut encoder_params = Vec::new();
         let mut fn_args = Vec::new();
         fn_args.push(quote! { &self });
 
@@ -120,9 +122,11 @@ pub fn emitter(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     let ty = &pat_type.ty;
                     fn_args.push(quote! { #p_name: #ty });
                     with_params.push(quote! { .with_param(#p_name_str, #p_name) });
+                    encoder_params.push(quote! { #p_name_str: #ty });
                 }
             }
         }
+        encoder_routes.push(quote! { #sig_name_str => (#(#encoder_params),*) });
 
         // Whatever the user wrote on the declaration travels to the generated method — the
         // declaration is discarded, so this is the only place their doc comment can land. A
@@ -148,6 +152,7 @@ pub fn emitter(_attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     let block_attrs = &block.attrs;
+    let channel_name = name.to_string();
 
     let gen = quote! {
         #(#block_attrs)*
@@ -161,6 +166,8 @@ pub fn emitter(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 routes: &[#(#route_names),*],
             }
         }
+
+        objectspell::__encoders! { #channel_name, [#(#encoder_routes),*] }
     };
 
     TokenStream::from(gen)
@@ -289,7 +296,7 @@ pub fn state(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
         #[objectspell::async_trait]
         impl objectspell::AnyState for #wrapper_name {
-            async fn start_listener(&self) -> Option<objectspell::tokio::task::JoinHandle<()>> {
+            async fn start_listener(&self) -> Option<objectspell::ListenerHandle> {
                 self.inner.lock().await.state_core.spawn_listener()
             }
             async fn sender(&self) -> Option<objectspell::tokio::sync::mpsc::UnboundedSender<objectspell::Signal>> {

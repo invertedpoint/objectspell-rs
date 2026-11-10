@@ -79,6 +79,11 @@ pub mod any_state;
 pub mod connector;
 /// The sending half of a component.
 pub mod emitter;
+/// Encoders for every emitter's signals (feature `serde`).
+#[cfg(feature = "serde")]
+pub mod encoding;
+/// Running a listener on this target's executor.
+pub mod listener;
 /// The receiving half of a component.
 pub mod receiver;
 /// What travels between components.
@@ -93,6 +98,7 @@ extern crate self as objectspell;
 // Re-export core types
 pub use any_state::AnyState;
 pub use emitter::EmitterCore;
+pub use listener::ListenerHandle;
 pub use receiver::SignalDispatcher;
 pub use signal::Signal;
 pub use state::StateCore;
@@ -150,4 +156,49 @@ pub fn emitter_routes_of(target: std::any::TypeId) -> Vec<&'static str> {
         .filter(|reg| (reg.target_type)() == target)
         .flat_map(|reg| reg.routes.iter().copied())
         .collect()
+}
+
+/// Registers an encoder for one emitter's signals. Called by `#[objectspell::emitter]`.
+///
+/// A proc-macro cannot see this crate's features, so the macro always calls this, and the
+/// feature decides what it expands to.
+#[doc(hidden)]
+#[cfg(feature = "serde")]
+#[macro_export]
+macro_rules! __encoders {
+    ($channel:literal, [$($route:literal => ($($param:literal : $ty:ty),*)),* $(,)?]) => {
+        $crate::inventory::submit! {
+            $crate::encoding::EncoderRegistration {
+                channel: $channel,
+                routes: &[$($crate::encoding::RouteParams { name: $route, params: &[$($param),*] }),*],
+                serializable: |route| {
+                    #[allow(unused_imports)]
+                    use $crate::encoding::{LocalOnly as _, ViaSerde as _};
+                    match route {
+                        $($route => (&$crate::encoding::Probe::<($($ty,)*)>(::core::marker::PhantomData))
+                            .serializable(),)*
+                        _ => false,
+                    }
+                },
+                encode: |signal| {
+                    #[allow(unused_imports)]
+                    use $crate::encoding::{LocalOnly as _, ViaSerde as _};
+                    match signal.route.as_str() {
+                        $($route => (&$crate::encoding::Probe::<($($ty,)*)>(::core::marker::PhantomData))
+                            .boxed(($($crate::encoding::argument::<$ty>(signal, $param)?,)*))
+                            .ok_or_else(|| $crate::encoding::local_route(signal)),)*
+                        _ => Err($crate::encoding::unknown_route(signal)),
+                    }
+                },
+            }
+        }
+    };
+}
+
+/// Without the `serde` feature there are no encoders.
+#[doc(hidden)]
+#[cfg(not(feature = "serde"))]
+#[macro_export]
+macro_rules! __encoders {
+    ($($anything:tt)*) => {};
 }

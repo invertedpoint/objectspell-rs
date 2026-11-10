@@ -182,3 +182,13 @@ fix it for local ones too — `docs/limitations.md` currently admits there is no
   no error path. This depends on `runtime-error-reporting.md` landing first.
 - **Does `#[key]` go far enough?** Ordering guarantees are per key; anything needing a total order
   across a channel cannot have one. That may deserve a louder warning than a doc note.
+
+## Prototype: a companion crate
+
+`~/lab/portalcraft-rs` tries the "companion crate" side of the first open question, for browsers
+over WebTransport rather than a broker. It needs two core changes and no `Transport` trait:
+listeners that run on the browser's event loop (`ListenerHandle`), and an optional `serde`
+feature with which every emitter registers an encoder (`objectspell::encoding`). Remote
+components are declared by a contract (their emitter block, under the companion's own attribute)
+and enter a topology as ordinary components implementing `AnyState`. Contracts are checked when
+two subsystems connect, by comparing route and parameter names.
