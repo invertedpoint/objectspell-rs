@@ -10,12 +10,15 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **The `serde` feature.** Every emitter also registers an encoder that turns one of its signals
   into a serialisable tuple of arguments (`objectspell::encoding`). Off by default. A signal
   with a parameter that is not `serde::Serialize` gets no encoder, and `serializable` says so.
+- **`ListenerHandle`.** A started listener, on Tokio natively or on the browser's event loop on
+  `wasm32`. `finished()` resolves once it has ended, however it ended.
 
 ### Changed
 
 - **Listeners run in browsers.** On `wasm32` a listener is spawned onto the browser's event loop
-  rather than Tokio. `AnyState::start_listener` now returns `Option<ListenerHandle>`; code that
-  implements `AnyState` by hand must follow. Components written with the macros are unaffected.
+  rather than Tokio. `AnyState::start_listener` and `StateCore::spawn_listener` now return
+  `Option<ListenerHandle>` instead of `Option<JoinHandle<()>>`; code that implements `AnyState` or
+  calls `spawn_listener` by hand must follow. Components written with the macros are unaffected.
 
 ## 0.1.0 - 2026-09-15
 
